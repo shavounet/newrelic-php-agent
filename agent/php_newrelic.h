@@ -601,6 +601,22 @@ nrapp_t* app; /* The application used in the last attempt to initialize a
 
 nrtxn_t* txn; /* The all-important transaction pointer */
 
+/*
+ * FrankenPHP worker mode gating flags (per-request/per-thread via NRPRG).
+ *
+ * rinit_active: true after RINIT, false after RSHUTDOWN. Used by
+ *   sapi_activate to distinguish worker per-request calls (rinit_active=true,
+ *   RINIT fired at boot and never followed by RSHUTDOWN) from classic mode
+ *   calls (rinit_active=false, sapi_activate fires before RINIT).
+ *
+ * worker_request_active: true after sapi_activate fires per-request begin,
+ *   false after sapi_deactivate fires per-request end. Pairs activate with
+ *   deactivate so the dummy request teardown (sapi_deactivate without a
+ *   preceding worker-mode sapi_activate) is skipped.
+ */
+bool rinit_active;
+bool worker_request_active;
+
 #if ZEND_MODULE_API_NO >= ZEND_8_0_X_API_NO \
     && !defined OVERWRITE_ZEND_EXECUTE_DATA
 nr_stack_t predis_ctxs; /* Without OAPI, we are able to utilize the call

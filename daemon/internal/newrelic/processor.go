@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/newrelic/newrelic-php-agent/daemon/internal/newrelic/collector"
@@ -114,6 +115,7 @@ type Processor struct {
 	appConnectBackoff     time.Duration
 	cfg                   ProcessorConfig
 	util                  *utilization.Data
+	integrationTxnSeq     uint64
 }
 
 func (p *Processor) processTxnData(d TxnData) {
@@ -968,7 +970,7 @@ type AgentDataHandler interface {
 	IncomingAppInfo(id *AgentRunID, info *AppInfo) AppInfoReply
 }
 
-func integrationLog(now time.Time, id AgentRunID, p PayloadCreator) {
+func integrationLog(now time.Time, id AgentRunID, seq uint64, p PayloadCreator) {
 	if p.Empty() {
 		return
 	}
@@ -977,24 +979,25 @@ func integrationLog(now time.Time, id AgentRunID, p PayloadCreator) {
 		log.Errorf("unable to create audit json payload for '%s': %s", p.Cmd(), err)
 		return
 	}
-	log.Infof("NR_INTEGRATION_TEST '%s' '%s'", p.Cmd(), js)
+	log.Infof("NR_INTEGRATION_TEST '%s' '%d' '%s'", p.Cmd(), seq, js)
 }
 
 func (p *Processor) IncomingTxnData(id AgentRunID, sample AggregaterInto) {
 	if p.cfg.IntegrationMode {
+		seq := atomic.AddUint64(&p.integrationTxnSeq, 1)
 		h := NewHarvest(time.Now(), collector.NewHarvestLimits(nil))
 		sample.AggregateInto(h)
 		now := time.Now()
-		integrationLog(now, id, h.Metrics)
-		integrationLog(now, id, h.CustomEvents)
-		integrationLog(now, id, h.ErrorEvents)
-		integrationLog(now, id, h.Errors)
-		integrationLog(now, id, h.SlowSQLs)
-		integrationLog(now, id, h.SpanEvents)
-		integrationLog(now, id, h.TxnTraces)
-		integrationLog(now, id, h.TxnEvents)
-		integrationLog(now, id, h.LogEvents)
-		integrationLog(now, id, h.PhpPackages)
+		integrationLog(now, id, seq, h.Metrics)
+		integrationLog(now, id, seq, h.CustomEvents)
+		integrationLog(now, id, seq, h.ErrorEvents)
+		integrationLog(now, id, seq, h.Errors)
+		integrationLog(now, id, seq, h.SlowSQLs)
+		integrationLog(now, id, seq, h.SpanEvents)
+		integrationLog(now, id, seq, h.TxnTraces)
+		integrationLog(now, id, seq, h.TxnEvents)
+		integrationLog(now, id, seq, h.LogEvents)
+		integrationLog(now, id, seq, h.PhpPackages)
 	}
 	p.txnDataChannel <- TxnData{ID: id, Sample: sample}
 }
