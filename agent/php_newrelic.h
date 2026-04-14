@@ -103,6 +103,10 @@ extern zend_module_entry newrelic_module_entry;
  */
 #define NR_UNUSED_TSRMLS
 
+/* move include here to avoid circular dependencies */
+#include "php_user_instrument.h"
+#include "php_user_instrument_wraprec_hashmap.h"
+
 typedef enum {
   NR_FW_UNSET = 0,
 
@@ -569,6 +573,20 @@ nrinibool_t message_tracer_segment_parameters_enabled; /* newrelic.segment_trace
  */
 uint64_t pid;
 nr_vector_t* user_function_wrappers;
+#endif
+
+#if ZEND_MODULE_API_NO >= ZEND_8_0_X_API_NO
+/*
+ * transient wrappers are stored at request level for thread safety
+ */
+nruserfn_t* transient_wraprecs; /* a singly linked list */
+
+/*
+ * User instrumentation wraprec hashmaps stored at request level for thread
+ * safety
+ */
+nr_func_hashmap_t* global_funcs_ht; /* hashmap for global functions */
+nr_scope_hashmap_t* scope_ht;       /* hashmap for scoped methods */
 #endif
 
 nrapp_t* app; /* The application used in the last attempt to initialize a

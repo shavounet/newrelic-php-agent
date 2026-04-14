@@ -9,6 +9,8 @@
 #include "util_memory.h"
 #include "util_strings.h"
 
+#if ZEND_MODULE_API_NO >= ZEND_8_0_X_API_NO
+
 // -----------------------------------------------------------------------------
 // func hash map
 
@@ -340,9 +342,6 @@ static void nr_scope_hashmap_destroy_internal(nr_scope_hashmap_t** hashmap_ptr) 
   nr_realfree((void**)hashmap_ptr);
 }
 
-nr_func_hashmap_t* global_funcs_ht = NULL;
-nr_scope_hashmap_t* scope_ht = NULL;
-
 /* This function expects full_name and full_name_len to be validated with
  * nr_php_user_instrument_is_name_valid() before being passed in.
  * Specifically, it requires that:
@@ -380,11 +379,11 @@ static void nr_php_user_instrument_wraprec_hashmap_name2keys(
 }
 
 void nr_php_user_instrument_wraprec_hashmap_init(void) {
-  if (NULL == scope_ht) {
-    scope_ht = nr_scope_hashmap_create_internal(0);
+  if (NULL == NRPRG(scope_ht)) {
+    NRPRG(scope_ht) = nr_scope_hashmap_create_internal(0);
   }
-  if (NULL == global_funcs_ht) {
-    global_funcs_ht = nr_func_hashmap_create_internal(0);
+  if (NULL == NRPRG(global_funcs_ht)) {
+    NRPRG(global_funcs_ht) = nr_func_hashmap_create_internal(0);
   }
 }
 
@@ -401,17 +400,16 @@ nruserfn_t* nr_php_user_instrument_wraprec_hashmap_add(const char* namestr, size
   bool is_new_wraprec = false;
   nruserfn_t* wraprec = NULL;
 
-
-  if (NULL == scope_ht || NULL == global_funcs_ht) {
+  if (NULL == NRPRG(scope_ht) || NULL == NRPRG(global_funcs_ht)) {
     return NULL;
   }
 
   nr_php_user_instrument_wraprec_hashmap_name2keys(&func_key, &scope_key, namestr, namestrlen);
 
   if (func_key.is_method) {
-    funcs_ht = nr_scope_hashmap_update_internal(scope_ht, &scope_key);
+    funcs_ht = nr_scope_hashmap_update_internal(NRPRG(scope_ht), &scope_key);
   } else {
-    funcs_ht = global_funcs_ht;
+    funcs_ht = NRPRG(global_funcs_ht);
   }
 
   if (NULL == funcs_ht) {
@@ -450,7 +448,7 @@ nruserfn_t* nr_php_user_instrument_wraprec_hashmap_get(zend_string *func_name, z
   nr_func_hashmap_key_t func_key = {0};
   nr_func_hashmap_t* funcs_ht = NULL;
 
-  if (NULL == scope_ht || NULL == global_funcs_ht) {
+  if (NULL == NRPRG(scope_ht) || NULL == NRPRG(global_funcs_ht)) {
     return NULL;
   }
   if (NULL == func_name) {
@@ -462,9 +460,9 @@ nruserfn_t* nr_php_user_instrument_wraprec_hashmap_get(zend_string *func_name, z
     scope_key.name = ZSTR_VAL(scope_name);
     scope_key.name_len = ZSTR_LEN(scope_name);
     scope_key.name_hash = ZSTR_HASH(scope_name);
-    funcs_ht = nr_scope_hashmap_lookup_internal(scope_ht, &scope_key);
+    funcs_ht = nr_scope_hashmap_lookup_internal(NRPRG(scope_ht), &scope_key);
   } else {
-    funcs_ht = global_funcs_ht;
+    funcs_ht = NRPRG(global_funcs_ht);
   }
 
   if (NULL == funcs_ht) {
@@ -479,11 +477,13 @@ nruserfn_t* nr_php_user_instrument_wraprec_hashmap_get(zend_string *func_name, z
 }
 
 void nr_php_user_instrument_wraprec_hashmap_destroy(void) {
-  if (NULL != scope_ht) {
-    nr_scope_hashmap_destroy_internal(&scope_ht);
+  if (NULL != NRPRG(scope_ht)) {
+    nr_scope_hashmap_destroy_internal(&NRPRG(scope_ht));
   }
-  if (NULL != global_funcs_ht) {
-    nr_func_hashmap_destroy_internal(&global_funcs_ht);
+  if (NULL != NRPRG(global_funcs_ht)) {
+    nr_func_hashmap_destroy_internal(&NRPRG(global_funcs_ht));
   }
   return;
 }
+
+#endif /* ZEND_MODULE_API_NO >= ZEND_8_0_X_API_NO */
